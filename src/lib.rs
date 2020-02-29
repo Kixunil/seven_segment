@@ -1,8 +1,12 @@
 //! Simple driver for 7-segment displays
 //!
-//! This is a driver (encoder) for 7-segment displays. It's implemented on top of embedded-hal, so you can use it on any platform that has pins with `embedded_hal::OutputPin` implemented.
+//! This is a driver (encoder) for 7-segment displays. It's implemented on top of embedded-hal, so
+//! you can use it on any platform that has pins with `embedded_hal::OutputPin` implemented.
 //!
-//! The driver is very simple, only supports displays that connect directly using seven pins such as [SA52-11EWA](http://www.kingbrightusa.com/images/catalog/SPEC/SA52-11EWA.pdf) and doesn't try to do anything clever like setting all pins at once. It supports both common anode and common cathode displays.
+//! The driver is very simple, only supports displays that connect directly using seven pins such
+//! as [SA52-11EWA](http://www.kingbrightusa.com/images/catalog/SPEC/SA52-11EWA.pdf) and doesn't
+//! try to do anything clever like setting all pins at once. It supports both common anode and
+//! common cathode displays.
 //!
 //! In order to use this crate, you have to instantiate `SevenSegmentPins` with your pins (see its
 //! documentation for a diagram) and convert it by calling appropriate `with_common_*()` method.
@@ -10,6 +14,8 @@
 //! digit.
 
 #![no_std]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 pub use embedded_hal::digital::v2::OutputPin;
 
@@ -69,12 +75,19 @@ impl Polarity for Cathode {}
 /// |/__d___\|
 /// ```
 pub struct SevenSegmentPins<A, B, C, D, E, F, G> {
+    /// Upper horizontal bar
     pub a: A,
+    /// Upper right vertical bar
     pub b: B,
+    /// Lower right vertical bar
     pub c: C,
+    /// Lower horizontal bar
     pub d: D,
+    /// Lower left vertical bar
     pub e: E,
+    /// Upper left vertival bar
     pub f: F,
+    /// Middle horizontal bar
     pub g: G,
 }
 
