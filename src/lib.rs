@@ -1,8 +1,12 @@
 //! Simple driver for 7-segment displays
 //!
-//! This is a driver (encoder) for 7-segment displays. It's implemented on top of embedded-hal, so you can use it on any platform that has pins with `embedded_hal::OutputPin` implemented.
-//! 
-//! The driver is very simple, only supports displays that connect directly using seven pins such as [SA52-11EWA](http://www.kingbrightusa.com/images/catalog/SPEC/SA52-11EWA.pdf) and doesn't try to do anything clever like setting all pins at once. It supports both common anode and common cathode displays.
+//! This is a driver (encoder) for 7-segment displays. It's implemented on top of embedded-hal, so
+//! you can use it on any platform that has pins with `embedded_hal::OutputPin` implemented.
+//!
+//! The driver is very simple, only supports displays that connect directly using seven pins such
+//! as [SA52-11EWA](http://www.kingbrightusa.com/images/catalog/SPEC/SA52-11EWA.pdf) and doesn't
+//! try to do anything clever like setting all pins at once. It supports both common anode and
+//! common cathode displays.
 //!
 //! In order to use this crate, you have to instantiate `SevenSegmentPins` with your pins (see its
 //! documentation for a diagram) and convert it by calling appropriate `with_common_*()` method.
@@ -10,8 +14,10 @@
 //! digit.
 
 #![no_std]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
-pub use embedded_hal::digital::OutputPin;
+pub use embedded_hal::digital::v2::OutputPin;
 
 /// Type erased definitions
 pub mod erased {
@@ -69,12 +75,19 @@ impl Polarity for Cathode {}
 /// |/__d___\|
 /// ```
 pub struct SevenSegmentPins<A, B, C, D, E, F, G> {
+    /// Upper horizontal bar
     pub a: A,
+    /// Upper right vertical bar
     pub b: B,
+    /// Lower right vertical bar
     pub c: C,
+    /// Lower horizontal bar
     pub d: D,
+    /// Lower left vertical bar
     pub e: E,
+    /// Upper left vertival bar
     pub f: F,
+    /// Middle horizontal bar
     pub g: G,
 }
 
@@ -127,76 +140,84 @@ pub struct SevenSegment<A, B, C, D, E, F, G, Common> {
     g: G,
 }
 
-impl<A, B, C, D, E, F, G, Common> SevenSegment<A, B, C, D, E, F, G, Common> where
-                                             A: OutputPin,
-                                             B: OutputPin,
-                                             C: OutputPin,
-                                             D: OutputPin,
-                                             E: OutputPin,
-                                             F: OutputPin,
-                                             G: OutputPin,
-                                             Common: Polarity
+impl<A, B, C, D, E, F, G, Common> SevenSegment<A, B, C, D, E, F, G, Common>
+where
+    A: OutputPin,
+    B: OutputPin<Error = A::Error>,
+    C: OutputPin<Error = A::Error>,
+    D: OutputPin<Error = A::Error>,
+    E: OutputPin<Error = A::Error>,
+    F: OutputPin<Error = A::Error>,
+    G: OutputPin<Error = A::Error>,
+    Common: Polarity,
 {
     /// Sets the value of the display.
     ///
     /// The valid values are 0-9. In case of invalid value, the display will be blank.
-    pub fn set(&mut self, value: u8) {
+    pub fn set(&mut self, value: u8) -> Result<(), A::Error> {
         let mask = match value {
-            //    a  b  c  d  e  f  g
-            0 => (1, 1, 1, 1, 1, 1, 0),
-            1 => (0, 1, 1, 0, 0, 0, 0),
-            2 => (1, 1, 0, 1, 1, 0, 1),
-            3 => (1, 1, 1, 1, 0, 0, 1),
-            4 => (0, 1, 1, 0, 0, 1, 1),
-            5 => (1, 0, 1, 1, 0, 1, 1),
-            6 => (1, 0, 1, 1, 1, 1, 1),
-            7 => (1, 1, 1, 0, 0, 0, 0),
-            8 => (1, 1, 1, 1, 1, 1, 1),
-            9 => (1, 1, 1, 1, 0, 1, 1),
+            //      a  b  c  d  e  f  g
+            0x0 => (1, 1, 1, 1, 1, 1, 0),
+            0x1 => (0, 1, 1, 0, 0, 0, 0),
+            0x2 => (1, 1, 0, 1, 1, 0, 1),
+            0x3 => (1, 1, 1, 1, 0, 0, 1),
+            0x4 => (0, 1, 1, 0, 0, 1, 1),
+            0x5 => (1, 0, 1, 1, 0, 1, 1),
+            0x6 => (1, 0, 1, 1, 1, 1, 1),
+            0x7 => (1, 1, 1, 0, 0, 0, 0),
+            0x8 => (1, 1, 1, 1, 1, 1, 1),
+            0x9 => (1, 1, 1, 1, 0, 1, 1),
+            0xa => (1, 1, 1, 0, 1, 1, 1),
+            0xb => (0, 0, 1, 1, 1, 1, 1),
+            0xc => (1, 0, 0, 1, 1, 1, 0),
+            0xd => (0, 1, 1, 1, 1, 0, 1),
+            0xe => (1, 0, 0, 1, 1, 1, 1),
+            0xf => (1, 0, 0, 0, 1, 1, 1),
             _ => (0, 0, 0, 0, 0, 0, 0),
         };
 
         if mask.0 == Common::is_cathode() as u8 {
-            self.a.set_high();
+            self.a.set_high()?;
         } else {
-            self.a.set_low();
+            self.a.set_low()?;
         }
 
         if mask.1 == Common::is_cathode() as u8 {
-            self.b.set_high();
+            self.b.set_high()?;
         } else {
-            self.b.set_low();
+            self.b.set_low()?;
         }
 
         if mask.2 == Common::is_cathode() as u8 {
-            self.c.set_high();
+            self.c.set_high()?;
         } else {
-            self.c.set_low();
+            self.c.set_low()?;
         }
 
         if mask.3 == Common::is_cathode() as u8 {
-            self.d.set_high();
+            self.d.set_high()?;
         } else {
-            self.d.set_low();
+            self.d.set_low()?;
         }
 
         if mask.4 == Common::is_cathode() as u8 {
-            self.e.set_high();
+            self.e.set_high()?;
         } else {
-            self.e.set_low();
+            self.e.set_low()?;
         }
 
         if mask.5 == Common::is_cathode() as u8 {
-            self.f.set_high();
+            self.f.set_high()?;
         } else {
-            self.f.set_low();
+            self.f.set_low()?;
         }
 
         if mask.6 == Common::is_cathode() as u8 {
-            self.g.set_high();
+            self.g.set_high()?;
         } else {
-            self.g.set_low();
+            self.g.set_low()?;
         }
+        Ok(())
     }
 }
 
@@ -219,12 +240,16 @@ mod tests {
         }
 
         impl super::OutputPin for &'_ mut TestPin {
-            fn set_high(&mut self) {
+            type Error = core::convert::Infallible;
+
+            fn set_high(&mut self) -> Result<(), Self::Error> {
                 (*self).0 = 1;
+                Ok(())
             }
 
-            fn set_low(&mut self) {
+            fn set_low(&mut self) -> Result<(), Self::Error> {
                 (*self).0 = 0;
+                Ok(())
             }
         }
 
@@ -246,12 +271,24 @@ mod tests {
                 e: &mut e,
                 f: &mut f,
                 g: &mut g,
-            }.with_common_anode();
+            }
+            .with_common_anode();
 
-            seven_segment.set(digit);
+            seven_segment.set(digit).expect("unable to set digit");
         }
 
-        assert_eq!((a.inv(), b.inv(), c.inv(), d.inv(), e.inv(), f.inv(), g.inv()), expected);
+        assert_eq!(
+            (
+                a.inv(),
+                b.inv(),
+                c.inv(),
+                d.inv(),
+                e.inv(),
+                f.inv(),
+                g.inv()
+            ),
+            expected
+        );
 
         let mut a = TestPin(2);
         let mut b = TestPin(2);
@@ -270,9 +307,10 @@ mod tests {
                 e: &mut e,
                 f: &mut f,
                 g: &mut g,
-            }.with_common_cathode();
+            }
+            .with_common_cathode();
 
-            seven_segment.set(digit);
+            seven_segment.set(digit).expect("unable to set digit");
         }
 
         assert_eq!((a.0, b.0, c.0, d.0, e.0, f.0, g.0), expected);
@@ -329,7 +367,36 @@ mod tests {
     }
 
     #[test]
+    fn digit_a() {
+        test_digit(0xa, (1, 1, 1, 0, 1, 1, 1));
+    }
+    #[test]
+    fn digit_b() {
+        test_digit(0xb, (0, 0, 1, 1, 1, 1, 1));
+    }
+
+    #[test]
+    fn digit_c() {
+        test_digit(0xc, (1, 0, 0, 1, 1, 1, 0));
+    }
+
+    #[test]
+    fn digit_d() {
+        test_digit(0xd, (0, 1, 1, 1, 1, 0, 1));
+    }
+
+    #[test]
+    fn digit_e() {
+        test_digit(0xe, (1, 0, 0, 1, 1, 1, 1));
+    }
+
+    #[test]
+    fn digit_f() {
+        test_digit(0xf, (1, 0, 0, 0, 1, 1, 1));
+    }
+
+    #[test]
     fn digit_invalid() {
-        test_digit(10, (0, 0, 0, 0, 0, 0, 0));
+        test_digit(0x10, (0, 0, 0, 0, 0, 0, 0));
     }
 }
