@@ -10,6 +10,7 @@
 //! digit.
 
 #![no_std]
+#![allow(deprecated)]
 
 pub use embedded_hal::digital::OutputPin;
 
@@ -19,38 +20,7 @@ pub mod erased {
     pub type SevenSegment<T, Common> = super::SevenSegment<T, T, T, T, T, T, T, Common>;
 }
 
-mod sealed {
-    pub trait Polarity {
-        fn is_cathode() -> bool;
-    }
-
-    impl Polarity for super::Anode {
-        fn is_cathode() -> bool {
-            false
-        }
-    }
-
-    impl Polarity for super::Cathode {
-        fn is_cathode() -> bool {
-            true
-        }
-    }
-}
-
-/// Polarity of the common electrode.
-///
-/// This trait is sealed and is only implemented for `Anode` and `Cathode` as they're all that's
-/// needed.
-pub trait Polarity: sealed::Polarity {}
-
-/// Marker type for common anode
-pub enum Anode {}
-
-/// Marker type for common cathode
-pub enum Cathode {}
-
-impl Polarity for Anode {}
-impl Polarity for Cathode {}
+pub use v_0_2::{Polarity, Anode, Cathode};
 
 /// Pins of the 7-sement display
 ///
@@ -68,6 +38,10 @@ impl Polarity for Cathode {}
 /// | |____| |
 /// |/__d___\|
 /// ```
+///
+/// # 0.2 compatibility note
+///
+/// This is a distinct struct due to inherent methods
 pub struct SevenSegmentPins<A, B, C, D, E, F, G> {
     pub a: A,
     pub b: B,
@@ -82,14 +56,17 @@ impl<A, B, C, D, E, F, G> SevenSegmentPins<A, B, C, D, E, F, G> {
     /// Constructs `SevenSegment` with specified polarity.
     pub fn with_common<Common: Polarity>(self) -> SevenSegment<A, B, C, D, E, F, G, Common> {
         SevenSegment {
-            common: Default::default(),
-            a: self.a,
-            b: self.b,
-            c: self.c,
-            d: self.d,
-            e: self.e,
-            f: self.f,
-            g: self.g,
+            inner:
+                v_0_2::SevenSegmentPins {
+                    a: self.a,
+                    b: self.b,
+                    c: self.c,
+                    d: self.d,
+                    e: self.e,
+                    f: self.f,
+                    g: self.g,
+                }
+                .with_common::<Common>()
         }
     }
 
@@ -116,15 +93,12 @@ impl<A, B, C, D, E, F, G> SevenSegmentPins<A, B, C, D, E, F, G> {
 /// appropriate pins high or low.
 ///
 /// Use `SevenSegmentPins` to construct it.
+///
+/// # 0.2 compatibility note
+///
+/// This is a distinct struct due to inherent methods
 pub struct SevenSegment<A, B, C, D, E, F, G, Common> {
-    common: core::marker::PhantomData<Common>,
-    a: A,
-    b: B,
-    c: C,
-    d: D,
-    e: E,
-    f: F,
-    g: G,
+    inner: v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>,
 }
 
 impl<A, B, C, D, E, F, G, Common> SevenSegment<A, B, C, D, E, F, G, Common> where
@@ -141,62 +115,59 @@ impl<A, B, C, D, E, F, G, Common> SevenSegment<A, B, C, D, E, F, G, Common> wher
     ///
     /// The valid values are 0-9. In case of invalid value, the display will be blank.
     pub fn set(&mut self, value: u8) {
-        let mask = match value {
-            //    a  b  c  d  e  f  g
-            0 => (1, 1, 1, 1, 1, 1, 0),
-            1 => (0, 1, 1, 0, 0, 0, 0),
-            2 => (1, 1, 0, 1, 1, 0, 1),
-            3 => (1, 1, 1, 1, 0, 0, 1),
-            4 => (0, 1, 1, 0, 0, 1, 1),
-            5 => (1, 0, 1, 1, 0, 1, 1),
-            6 => (1, 0, 1, 1, 1, 1, 1),
-            7 => (1, 1, 1, 0, 0, 0, 0),
-            8 => (1, 1, 1, 1, 1, 1, 1),
-            9 => (1, 1, 1, 1, 0, 1, 1),
-            _ => (0, 0, 0, 0, 0, 0, 0),
+        // We have to do this to maintain logical backwards-compatibility,
+        // since in the old version 10 means blank, but in the new version it's `a`.
+        let value = if value > 9 {
+            255
+        } else {
+            value
         };
 
-        if mask.0 == Common::is_cathode() as u8 {
-            self.a.set_high();
-        } else {
-            self.a.set_low();
-        }
+        self
+            .inner
+            .set(value)
+            // Why this is not `.unwrap_or_else(|e| match e {})`: unfortunately, the authors of
+            // embedded-hal used `()` instead of `Infallible` or `void::Void` in the error type,
+            // so this must be expect. :(
+            .expect("this can't fail")
+    }
+}
 
-        if mask.1 == Common::is_cathode() as u8 {
-            self.b.set_high();
-        } else {
-            self.b.set_low();
+impl<A, B, C, D, E, F, G, Common> From<v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>> for SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn from(value: v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>) -> Self {
+        SevenSegment {
+            inner: value,
         }
+    }
+}
 
-        if mask.2 == Common::is_cathode() as u8 {
-            self.c.set_high();
-        } else {
-            self.c.set_low();
-        }
+impl<A, B, C, D, E, F, G, Common> From<SevenSegment<A, B, C, D, E, F, G, Common>> for v_0_2::SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn from(value: SevenSegment<A, B, C, D, E, F, G, Common>) -> Self {
+        value.inner
+    }
+}
 
-        if mask.3 == Common::is_cathode() as u8 {
-            self.d.set_high();
-        } else {
-            self.d.set_low();
-        }
+impl<A, B, C, D, E, F, G, Common> AsRef<v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>> for SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn as_ref(&self) -> &v_0_2::SevenSegment<A, B, C, D, E, F, G, Common> {
+        &self.inner
+    }
+}
 
-        if mask.4 == Common::is_cathode() as u8 {
-            self.e.set_high();
-        } else {
-            self.e.set_low();
-        }
+impl<A, B, C, D, E, F, G, Common> AsMut<v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>> for SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn as_mut(&mut self) -> &mut v_0_2::SevenSegment<A, B, C, D, E, F, G, Common> {
+        &mut self.inner
+    }
+}
 
-        if mask.5 == Common::is_cathode() as u8 {
-            self.f.set_high();
-        } else {
-            self.f.set_low();
-        }
+impl<A, B, C, D, E, F, G, Common> core::borrow::Borrow<v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>> for SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn borrow(&self) -> &v_0_2::SevenSegment<A, B, C, D, E, F, G, Common> {
+        &self.inner
+    }
+}
 
-        if mask.6 == Common::is_cathode() as u8 {
-            self.g.set_high();
-        } else {
-            self.g.set_low();
-        }
+impl<A, B, C, D, E, F, G, Common> core::borrow::BorrowMut<v_0_2::SevenSegment<A, B, C, D, E, F, G, Common>> for SevenSegment<A, B, C, D, E, F, G, Common> {
+    fn borrow_mut(&mut self) -> &mut v_0_2::SevenSegment<A, B, C, D, E, F, G, Common> {
+        &mut self.inner
     }
 }
 

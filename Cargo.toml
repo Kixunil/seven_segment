@@ -1,6 +1,6 @@
 [package]
 name = "seven_segment"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Martin Habovstiak <martin.habovstiak@gmail.com>"]
 edition = "2018"
 description = "A simple driver for seven segment displays"
@@ -11,4 +11,5 @@ readme = "README.md"
 repository = "https://github.com/Kixunil/seven_segment"
 
 [dependencies]
+v_0_2 = { package = "seven_segment", version = "0.2.1" }
 embedded-hal = "0.2.2"
